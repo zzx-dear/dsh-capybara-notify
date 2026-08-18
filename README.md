@@ -21,7 +21,7 @@
 ### 1. 插件本体
 
 ```sh
-dsh plugin --profile <你的profile> add "github:<owner>/dsh-capybara-notify"
+dsh plugin --profile <你的profile> add "github:zzx-dear/dsh-capybara-notify"
 # 或本地开发：
 dsh plugin --profile web add link:/path/to/dsh-capybara-notify
 ```
@@ -153,7 +153,7 @@ checks/check_process.sh dsh                       # 进程不在才通知
 
 ```sh
 # 1. install plugin
-dsh plugin --profile web add "github:<owner>/dsh-capybara-notify"
+dsh plugin --profile web add "github:zzx-dear/dsh-capybara-notify"
 
 # 2. optional desktop pet (macOS)
 bash /path/to/dsh-capybara-notify/pet/install_pet.sh
@@ -165,6 +165,23 @@ bash /path/to/dsh-capybara-notify/checks/notify.sh -t "Hello" -b "capybara is li
 Alerts POST to `/api/secretary/notify`; the pet bubble + ding reads `/api/secretary/queue`.
 Session-aware alerts (turn done / approval asked / turn blocked) work out of the box;
 disable with env `SECRETARY_SESSION_ALERTS=0`.
+
+## FAQ
+
+**Q: 宠物窗口一片空白？**
+A: dsh web 可能还没启动。宠物每 3 秒重试加载，web 上线后自动恢复；也可以看 `/tmp/lulu-pet.err.log`。
+
+**Q: 想换个宠物形象？**
+A: 把你的 Codex Pet 放进 `~/.codex/pets/<id>/`（pet.json + 8×9 图集），`LULU_PET_ID=<id>` 启动；改完需要重启 dsh web 让宠物注册表重建。
+
+**Q: 告警响了但没气泡？**
+A: 气泡只显示 ≤22 字的正文；超过就只显示标题。检查 `/api/secretary/queue` 里告警是否落盘。
+
+**Q: 浏览器里又出现了内置宠物？**
+A: 执行 `curl -X POST http://127.0.0.1:3080/api/pet/set-visible -H 'content-type: application/json' -d '{"visible": false}'`；或浏览器控制台 `localStorage.setItem("dsh-capybara:gui-pet", "hidden")` 后刷新。
+
+**Q: 会话提醒太吵？**
+A: dsh 进程环境变量 `SECRETARY_SESSION_ALERTS=0` 关闭全部会话提醒，告警 API 不受影响。
 
 ## License
 
