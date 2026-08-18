@@ -1,0 +1,42 @@
+{
+  "name": "dsh-capybara-notify",
+  "version": "0.1.0",
+  "description": "Capybara secretary for DeepSeek Harness: desktop pet notifications, alert inbox API, session-aware alerts (turn done / approval needed), and daily plugin recommendations. · DSH 水豚秘书：桌面宠物通知、告警收件箱 API、会话智能提醒（任务完成/需要确认）与每日插件推荐。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/*.js",
+    "cordis.patch.yml"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "pet",
+    "notification",
+    "secretary",
+    "capybara"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web"
+    }
+  }
+}

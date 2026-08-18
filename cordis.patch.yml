@@ -1,0 +1,4 @@
+# dsh-capybara-notify bundle patch: inserts the secretary row into the web roster.
+- insert:
+    - id: secretary
+      name: 'dsh-capybara-notify'

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>噜噜</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; background: transparent;
+    overflow: hidden; width: 100%; height: 100%;
+    user-select: none; -webkit-user-select: none;
+  }
+  /* 气泡窗口 */
+  #bubbleWrap {
+    position: absolute; left: 50%; top: 4px; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    max-width: calc(100vw - 8px); z-index: 3; pointer-events: none;
+  }
+  .bub {
+    background: rgba(58, 36, 23, 0.96); color: #fdf6ec;
+    padding: 5px 10px; border-radius: 10px;
+    font: 11px/1.35 -apple-system, "PingFang SC", sans-serif;
+    max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    animation: pop .22s ease-out; text-align: center;
+  }
+  .bub.warning { background: rgba(122, 86, 24, 0.97); }
+  .bub.error   { background: rgba(122, 34, 26, 0.97); }
+  .bub.alert   { background: rgba(48, 96, 160, 0.97); font-weight: 600; }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+  /* 精灵窗口 */
+  #sprite {
+    position: absolute; left: 50%; bottom: 0;
+    width: 192px; height: 208px; cursor: grab;
+    transform-origin: bottom center;
+  }
+  #sprite:active { cursor: grabbing; }
+  #close {
+    position: absolute; right: 0; top: 0; width: 16px; height: 16px;
+    border-radius: 50%; background: rgba(0,0,0,.45); color: #fff;
+    font: 9px/16px sans-serif; text-align: center; cursor: pointer;
+    opacity: 0; transition: opacity .2s; z-index: 5;
+  }
+  body:hover #close { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="bubbleWrap"></div>
+<div id="sprite"></div>
+<div id="close" title="退出噜噜">✕</div>
+<script>
+const ROLE = new URLSearchParams(location.search).get("role") || "sprite";
+const PET_ID = new URLSearchParams(location.search).get("pet") || "capybara-ruru";
+const API = "";
+const SCALE = __SCALE__;
+const ROWS = ["idle","running-right","running-left","waving","jumping","failed","waiting","running","review"];
+
+const sprite = document.getElementById("sprite");
+const bubbleWrap = document.getElementById("bubbleWrap");
+let pet = null, state = null, anim = "idle", frame = 0, lastAdv = 0, track = null;
+
+function selectTrack(name) {
+  return pet && pet.tracks ? (pet.tracks[name] || pet.tracks.idle) : null;
+}
+function renderFrame() {
+  if (!pet || !track) return;
+  const col = track.frames[Math.min(frame, track.frames.length - 1)];
+  const row = ROWS.indexOf(anim);
+  sprite.style.backgroundImage = `url(${API}${pet.atlasUrl})`;
+  sprite.style.backgroundSize = `${pet.cell.width * pet.columns}px ${pet.cell.height * 9}px`;
+  sprite.style.backgroundPosition = `-${col * pet.cell.width}px -${row * pet.cell.height}px`;
+  sprite.style.backgroundRepeat = "no-repeat";
+}
+function tick(ts) {
+  if (pet) {
+    const want = (state && state.animation) ? state.animation : "idle";
+    if (want !== anim) {
+      anim = ROWS.includes(want) ? want : "idle";
+      track = selectTrack(anim);
+      frame = 0; lastAdv = ts;
+    }
+    if (track && track.durations) {
+      const d = track.durations[frame] || 400;
+      if (ts - lastAdv >= d) {
+        lastAdv = ts;
+        if (frame < track.frames.length - 1) frame++;
+        else if (track.loop) frame = 0;
+        else if (track.fallback) { anim = track.fallback; track = selectTrack(anim); frame = 0; }
+      }
+    }
+    renderFrame();
+  }
+  requestAnimationFrame(tick);
+}
+
+function showBubble(text, cls, ms) {
+  const el = document.createElement("div");
+  el.className = "bub" + (cls ? " " + cls : "");
+  el.textContent = text;
+  bubbleWrap.appendChild(el);
+  while (bubbleWrap.children.length > 2) bubbleWrap.removeChild(bubbleWrap.firstChild);
+  if (ms) setTimeout(() => { if (el.parentNode) el.remove(); }, ms);
+  return el;
+}
+
+async function pollState() {
+  try {
+    const res = await fetch(`${API}/api/pet/state`);
+    state = await res.json();
+  } catch {}
+  setTimeout(pollState, 1500);
+}
+
+// ---------- 告警（精灵窗：叮咚；气泡窗：显示） ----------
+let audioCtx = null, lastAlertId = null, alertBaseline = false;
+function ding() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const t = audioCtx.currentTime;
+    [[880, 0], [1174.66, 0.16]].forEach(([f, at]) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + at);
+      g.gain.exponentialRampToValueAtTime(0.18, t + at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.5);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t + at); o.stop(t + at + 0.55);
+    });
+  } catch {}
+}
+async function pollAlerts() {
+  try {
+    const res = await fetch(`${API}/api/secretary/queue`);
+    const data = await res.json();
+    const fresh = (data.alerts || []).find(a => !a.acked);
+    if (!alertBaseline) {
+      lastAlertId = fresh ? fresh.id : null;
+      alertBaseline = true;
+    } else if (fresh && fresh.id !== lastAlertId) {
+      lastAlertId = fresh.id;
+      if (ROLE === "bubble") {
+        const cls = fresh.level === "error" ? "error" : fresh.level === "warning" ? "warning" : "alert";
+        showBubble(`${fresh.title || "提醒"}${fresh.body ? "：" + fresh.body : ""}`, cls, 8000);
+      } else {
+        ding();
+      }
+    }
+  } catch {}
+  setTimeout(pollAlerts, 3000);
+}
+
+// ---------- 互动（精灵窗） ----------
+async function interact(kind) {
+  try {
+    const res = await fetch(`${API}/api/pet/interact`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind }),
+    });
+    const r = await res.json();
+    if (r && r.reaction) {
+      try { localStorage.setItem("lulu-reaction", JSON.stringify({ text: r.reaction, at: Date.now() })); } catch {}
+    }
+  } catch {}
+}
+if (ROLE === "sprite") {
+  let clickAt = 0;
+  let downAt = null, downXY = null, moved = false;
+  sprite.addEventListener("mousedown", (e) => {
+    if (e.button === 2) { pywebview.api.quit(); return; }
+    downAt = Date.now(); downXY = [e.screenX, e.screenY]; moved = false;
+  });
+  sprite.addEventListener("mousemove", (e) => {
+    if (downAt && downXY && (Math.abs(e.screenX - downXY[0]) + Math.abs(e.screenY - downXY[1]) > 6)) moved = true;
+  });
+  sprite.addEventListener("mouseup", () => {
+    if (!downAt || moved) { downAt = null; return; }
+    const now = Date.now();
+    downAt = null;
+    if (now - clickAt < 400) { interact("feed"); clickAt = 0; }
+    else { interact("pet"); clickAt = now; }
+  });
+  sprite.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.getElementById("close").addEventListener("click", () => pywebview.api.quit());
+  document.addEventListener("pointerdown", () => {
+    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch {}
+  }, { once: true });
+}
+
+// ---------- 互动反馈气泡（跨窗口 via localStorage） ----------
+if (ROLE === "bubble") {
+  let lastReaction = null;
+  setInterval(() => {
+    try {
+      const raw = localStorage.getItem("lulu-reaction");
+      if (!raw) return;
+      const r = JSON.parse(raw);
+      if (!lastReaction || r.at !== lastReaction.at) {
+        lastReaction = r;
+        showBubble(r.text, "", 2500);
+      }
+    } catch {}
+  }, 800);
+}
+
+// ---------- 启动 ----------
+(async () => {
+  if (ROLE === "bubble") {
+    sprite.style.display = "none";
+    document.getElementById("close").style.display = "none";
+  } else {
+    bubbleWrap.style.display = "none";
+  }
+  sprite.style.transform = `translateX(-50%) scale(${SCALE})`;
+  requestAnimationFrame(tick);
+  loadPet();
+  pollState();
+  pollAlerts();
+})();
+
+// 精灵图集加载（带重试）：dsh web 可能还没起来（开机自启/重启期间），
+// 失败就每 3 秒重试，web 上线后自动恢复渲染。
+async function loadPet() {
+  try {
+    const res = await fetch(`${API}/api/pet/pets`);
+    const pets = await res.json();
+    const p = pets.find(x => x.id === PET_ID) || pets[0];
+    if (p) {
+      pet = p;
+      track = selectTrack("idle");
+      frame = 0;
+      renderFrame();
+      return;
+    }
+  } catch {}
+  setTimeout(loadPet, 3000);
+}
+</script>
+</body>
+</html>

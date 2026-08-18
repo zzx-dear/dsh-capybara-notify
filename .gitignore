@@ -1,0 +1,7 @@
+pet/.venv/
+pet/lulu-pos.json
+__pycache__/
+*.pyc
+plugin-daily.log
+.plugin-check-state.json
+.DS_Store
