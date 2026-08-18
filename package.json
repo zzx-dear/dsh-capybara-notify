@@ -38,5 +38,13 @@
       ],
       "platform": "web"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzx-dear/dsh-capybara-notify.git"
+  },
+  "homepage": "https://github.com/zzx-dear/dsh-capybara-notify#readme",
+  "bugs": {
+    "url": "https://github.com/zzx-dear/dsh-capybara-notify/issues"
   }
 }
