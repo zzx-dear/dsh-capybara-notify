@@ -116,6 +116,17 @@ class Api:
         self.windows = []
 
     def quit(self):
+        # 用户主动退出（✕/右键）时，注销 launchd 任务，避免 KeepAlive 立即复活。
+        try:
+            import subprocess
+            uid = os.getuid()
+            subprocess.Popen(
+                ["launchctl", "bootout", f"gui/{uid}", "com.lulu.pet"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except Exception:
+            pass
         for w in list(self.windows):
             try:
                 w.destroy()

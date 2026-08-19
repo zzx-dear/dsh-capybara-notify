@@ -37,10 +37,9 @@ cat > "$PLIST" <<PLIST_EOF
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
-  <dict>
-    <key>SuccessfulExit</key>
-    <false/>
-  </dict>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
   <key>ProcessType</key>
   <string>Interactive</string>
   <key>StandardOutPath</key>
